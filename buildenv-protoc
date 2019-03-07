@@ -1,0 +1,183 @@
+#! /usr/bin/env python
+
+# (c) Andrei Nigmatulin, 2019
+
+from __future__ import print_function
+
+import os
+import sys
+import glob
+import tempfile
+import subprocess
+from braceexpand import braceexpand
+import google.protobuf.descriptor_pb2 as descriptor
+
+debug = os.environ.get('BUILDENV_PROTOC_DEBUG', '') != ''
+
+gopath = os.environ.get('GOPATH', '').split(':')
+if gopath == ['']:
+	gopath = []
+
+env_proto_path = os.environ.get('PROTO_PATH', '').split(':')
+if env_proto_path == ['']:
+	env_proto_path = []
+
+env_proto_path_n = len(env_proto_path)
+
+args = sys.argv[1:]
+# first expand @args
+expanded_args = []
+for arg in args:
+	if arg.startswith('@'):
+		with open(arg[1:], 'r') as f:
+			for line in f.readlines():
+				expanded_args.append(line.rstrip('\n').rstrip('\r'))
+	else:
+		expanded_args.append(arg)
+
+options = []
+cmd_proto_path = []
+proto_files = []
+for i, arg in enumerate(expanded_args):
+	if arg.startswith('-'):
+		if arg.startswith('-I'):
+			cmd_proto_path.append(arg[2:].strip())
+		elif arg.startswith('--proto_path='):
+			cmd_proto_path.append(arg.split('=', 1)[1])
+		elif arg == '-x':
+			debug = True
+		else:
+			options.append(arg)
+		continue
+	else:
+		proto_files = args[i:]
+		break
+
+# if no paths were given we assume all proto are relative to cwd
+if len(cmd_proto_path) == 0:
+	default_proto_path = [ os.getcwd() ]
+else:
+	default_proto_path = []
+
+gopath_proto_path = [ os.path.join(path, "src") for path in gopath ]
+
+proto_path = cmd_proto_path + default_proto_path + env_proto_path + gopath_proto_path
+
+path_options = [ "-I{}".format(path) for path in cmd_proto_path + env_proto_path + gopath_proto_path ]
+
+# function 1: glob and braces expansion for proto files
+def expand_glob_and_braces(proto_files):
+	expanded_proto_files = []
+	for glob_braces_proto_file in proto_files:
+		glob_expanded_proto_files = glob.glob(glob_braces_proto_file)
+		if 0 == len(glob_expanded_proto_files):
+			glob_expanded_proto_files = [glob_braces_proto_file]
+		for braces_proto_file in glob_expanded_proto_files:
+			braces_expanded_proto_files = braceexpand(braces_proto_file)
+			expanded_proto_files += braces_expanded_proto_files
+	return expanded_proto_files
+
+expanded_proto_files = expand_glob_and_braces(proto_files)
+
+if len(expanded_proto_files) == 0:
+	os.execvp("protoc", ["protoc"] + args)
+	exit(1)
+
+# function 2: help gogo compiler to associate imported proto files with corresponding go packages
+# by providing a list of substitutions imported_proto->go_package
+def get_fds(proto_files):
+	global path_options, debug
+	with tempfile.NamedTemporaryFile(mode='rb', delete=False) as fds_file:
+		exec_args = ['protoc'] + path_options + \
+			["--descriptor_set_out={}".format(fds_file.name)] + \
+			proto_files
+
+		if debug:
+			print("+ get_fds() execute: ", exec_args, file=sys.stderr)
+
+		try:
+			subprocess.check_call(exec_args)
+		except subprocess.CalledProcessError:
+			return None
+		fds_body = fds_file.read()
+		ret = descriptor.FileDescriptorSet()
+		ret.ParseFromString(fds_body)
+		return ret
+
+# try all proto_path in a search for test
+def find_full_path(test):
+	global proto_path, debug
+	for path in proto_path:
+		test_full_path = os.path.join(path, test)
+		if os.path.exists(test_full_path):
+			if debug:
+				print("+ found {} in {}".format(test, test_full_path), file=sys.stderr)
+			return test_full_path
+	if debug:
+		print("+ not found {} in {}".format(test, proto_path), file=sys.stderr)
+	return None
+
+if len(gopath) > 0 and any(option.startswith('--gogo_out=') for option in options):
+	substitutions = {}
+
+	fds = get_fds(expanded_proto_files)
+
+	if fds is not None:
+
+		for fdp in fds.file:
+			go_package = fdp.options.go_package
+			this_proto_full_path = find_full_path(fdp.name)
+
+			assert this_proto_full_path is not None
+
+			for dep in fdp.dependency:
+				dep_full_path = find_full_path(dep)
+				if dep_full_path is not None:
+
+					# now we need to sneak into go_package option in each dependancy
+					dep_fds = get_fds([dep])
+					assert dep_fds is not None
+					assert len(dep_fds.file) == 1
+					dep_fdp = dep_fds.file[0]
+					dep_go_package = dep_fdp.options.go_package
+					if '/' in dep_go_package:
+						# the go package was specified explicitly, no need to help gogo generator
+						if debug:
+							print("+ no substitution for {}, go_package is {}", dep, dep_go_package, file=sys.stderr)
+						continue
+
+					# do nothing for neighbour proto files
+					if os.path.dirname(this_proto_full_path) == os.path.dirname(dep_full_path):
+						continue
+
+					# finally find corresponding go package which dependancy proto file belongs to
+					for gopath_src in gopath_proto_path:
+						if dep_full_path.startswith(gopath_src):
+							substitutions[dep] = os.path.dirname(dep_full_path[len(gopath_src) + 1:])
+							break
+
+		if debug:
+			print("+ substitutions: ", sorted(substitutions.items()), file=sys.stderr)
+			for k, v in sorted(substitutions.items()):
+				print("+     {} -> {}".format(k, v), file=sys.stderr)
+
+		if len(substitutions) > 0:
+			for i, option in enumerate(options):
+				if option.startswith('--gogo_out='):
+					arg = option.split('=', 1)[1]
+					substitutions_list = ",".join( "M{}={}".format(k, v) for k, v in sorted(substitutions.items()) )
+					if ':' in arg:
+						# there are some gogo options already given
+						option = '--gogo_out={},{}'.format(substitutions_list, arg)
+					else:
+						# no gogo options given
+						option = '--gogo_out={}:{}'.format(substitutions_list, arg)
+					options[i] = option
+
+exec_args = ["protoc"] + path_options + options + expanded_proto_files
+
+if debug:
+	print("+ final execute: ", exec_args, file=sys.stderr)
+
+os.execvp("protoc", exec_args)
+exit(1)
