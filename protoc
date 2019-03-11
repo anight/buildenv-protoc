@@ -178,7 +178,7 @@ if len(gopath) > 0 and any(option.startswith('--gogo_out=') for option in option
 					if '/' in dep_go_package:
 						# the go package was specified explicitly, no need to help gogo generator
 						if debug:
-							print("+ no substitution for {}, go_package is {}", dep, dep_go_package, file=sys.stderr)
+							print("+ no substitution for {}, go_package is {}".format(dep, dep_go_package), file=sys.stderr)
 						continue
 
 					# do nothing for neighbour proto files
