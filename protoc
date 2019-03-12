@@ -1,6 +1,8 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 # (c) Andrei Nigmatulin, 2019
+
+from __future__ import print_function
 
 import os
 import sys
