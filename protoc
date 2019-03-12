@@ -47,7 +47,7 @@ for i, arg in enumerate(expanded_args):
 		if arg.startswith('-I=') or arg.startswith('--proto_path='):
 			cmd_proto_path += [ path for path in arg.split('=', 1)[1].split(':') if path != '' ]
 		elif arg.startswith('-I'):
-			cmd_proto_path.append(arg[2:].strip())
+			cmd_proto_path.append(arg[2:])
 		elif arg == '-x':
 			debug = True
 		else:
@@ -63,9 +63,17 @@ if len(cmd_proto_path) == 0:
 else:
 	default_cwd_path = []
 
-gopath_proto_path = [ os.path.join(path, "src") for path in gopath if os.path.exists(path) ]
+gopath_proto_path = []
+for path in gopath:
+	path = os.path.join(path, "src")
+	if os.path.exists(path):
+		gopath_proto_path.append(path)
 
-default_google_protobuf_path = [ os.path.join(path, "src/github.com/gogo/protobuf/protobuf") for path in gopath if os.path.exists(path) ]
+default_google_protobuf_path = []
+for path in gopath:
+	path = os.path.join(path, "src/github.com/gogo/protobuf/protobuf")
+	if os.path.exists(path):
+		default_google_protobuf_path.append(path)
 
 if debug:
 	print("+ cmd_proto_path:", cmd_proto_path, file=sys.stderr)
