@@ -1,8 +1,6 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # (c) Andrei Nigmatulin, 2019
-
-from __future__ import print_function
 
 import os
 import sys
@@ -15,6 +13,7 @@ import google.protobuf.descriptor_pb2 as descriptor
 protoc = os.environ.get('PROTOC', None)
 if protoc is None:
 	print("Error: PROTOC env var should be set to original protoc compiler version >= 3.5.1", file=sys.stderr)
+	exit(1)
 
 debug = os.environ.get('BUILDENV_PROTOC_DEBUG', '') != ''
 
