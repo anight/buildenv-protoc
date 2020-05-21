@@ -148,16 +148,12 @@ if len(gopath) > 0 and any(option.startswith('--go_out=') for option in options)
 
 	default_substitutions = {
 		# some proto files from google, a part of protobuf distribution
-		'google/protobuf/any.proto':                 'github.com/golang/protobuf/types',
-		'google/protobuf/api.proto':                 'github.com/golang/protobuf/types',
-		'google/protobuf/duration.proto':            'github.com/golang/protobuf/types',
-		'google/protobuf/empty.proto':               'github.com/golang/protobuf/types',
-		'google/protobuf/field_mask.proto':          'github.com/golang/protobuf/types',
-		'google/protobuf/source_context.proto':      'github.com/golang/protobuf/types',
-		'google/protobuf/struct.proto':              'github.com/golang/protobuf/types',
-		'google/protobuf/timestamp.proto':           'github.com/golang/protobuf/types',
-		'google/protobuf/type.proto':                'github.com/golang/protobuf/types',
-		'google/protobuf/wrappers.proto':            'github.com/golang/protobuf/types',
+		'google/protobuf/any.proto':                 'github.com/golang/protobuf/ptypes/any',
+		'google/protobuf/duration.proto':            'github.com/golang/protobuf/ptypes/duration',
+		'google/protobuf/empty.proto':               'github.com/golang/protobuf/ptypes/empty',
+		'google/protobuf/struct.proto':              'github.com/golang/protobuf/ptypes/struct',
+		'google/protobuf/timestamp.proto':           'github.com/golang/protobuf/ptypes/timestamp',
+		'google/protobuf/wrappers.proto':            'github.com/golang/protobuf/ptypes/wrappers',
 		'google/protobuf/descriptor.proto':          'github.com/golang/protobuf/protoc-gen-go/descriptor',
 		'google/protobuf/compiler/plugin.proto':     'github.com/golang/protobuf/protoc-gen-go/plugin',
 	}
