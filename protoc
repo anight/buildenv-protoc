@@ -70,7 +70,7 @@ for path in gopath:
 
 default_google_protobuf_path = []
 for path in gopath:
-	path = os.path.join(path, "src/github.com/gogo/protobuf/protobuf")
+	path = os.path.join(path, "src/github.com/golang/protobuf/protobuf")
 	if os.path.exists(path):
 		default_google_protobuf_path.append(path)
 
@@ -110,7 +110,7 @@ if len(expanded_proto_files) == 0:
 	os.execvp(protoc, ["protoc"] + args)
 	exit(1)
 
-# function 2: help gogo compiler to associate imported proto files with corresponding go packages
+# function 2: help go protobuf compiler to associate imported proto files with corresponding go packages
 # by providing a list of substitutions imported_proto->go_package
 def get_fds(proto_files, this_run_cmd_proto_path):
 	global protoc, debug
@@ -144,22 +144,22 @@ def find_full_path(test):
 		print("+ not found {} in {}".format(test, proto_search_path), file=sys.stderr)
 	return None, None
 
-if len(gopath) > 0 and any(option.startswith('--gogo_out=') for option in options):
+if len(gopath) > 0 and any(option.startswith('--go_out=') for option in options):
 
 	default_substitutions = {
 		# some proto files from google, a part of protobuf distribution
-		'google/protobuf/any.proto':                 'github.com/gogo/protobuf/types',
-		'google/protobuf/api.proto':                 'github.com/gogo/protobuf/types',
-		'google/protobuf/duration.proto':            'github.com/gogo/protobuf/types',
-		'google/protobuf/empty.proto':               'github.com/gogo/protobuf/types',
-		'google/protobuf/field_mask.proto':          'github.com/gogo/protobuf/types',
-		'google/protobuf/source_context.proto':      'github.com/gogo/protobuf/types',
-		'google/protobuf/struct.proto':              'github.com/gogo/protobuf/types',
-		'google/protobuf/timestamp.proto':           'github.com/gogo/protobuf/types',
-		'google/protobuf/type.proto':                'github.com/gogo/protobuf/types',
-		'google/protobuf/wrappers.proto':            'github.com/gogo/protobuf/types',
-		'google/protobuf/descriptor.proto':          'github.com/gogo/protobuf/protoc-gen-gogo/descriptor',
-		'google/protobuf/compiler/plugin.proto':     'github.com/gogo/protobuf/protoc-gen-gogo/plugin',
+		'google/protobuf/any.proto':                 'github.com/golang/protobuf/types',
+		'google/protobuf/api.proto':                 'github.com/golang/protobuf/types',
+		'google/protobuf/duration.proto':            'github.com/golang/protobuf/types',
+		'google/protobuf/empty.proto':               'github.com/golang/protobuf/types',
+		'google/protobuf/field_mask.proto':          'github.com/golang/protobuf/types',
+		'google/protobuf/source_context.proto':      'github.com/golang/protobuf/types',
+		'google/protobuf/struct.proto':              'github.com/golang/protobuf/types',
+		'google/protobuf/timestamp.proto':           'github.com/golang/protobuf/types',
+		'google/protobuf/type.proto':                'github.com/golang/protobuf/types',
+		'google/protobuf/wrappers.proto':            'github.com/golang/protobuf/types',
+		'google/protobuf/descriptor.proto':          'github.com/golang/protobuf/protoc-gen-go/descriptor',
+		'google/protobuf/compiler/plugin.proto':     'github.com/golang/protobuf/protoc-gen-go/plugin',
 	}
 
 	substitutions = {}
@@ -185,7 +185,7 @@ if len(gopath) > 0 and any(option.startswith('--gogo_out=') for option in option
 					dep_fdp = dep_fds.file[0]
 					dep_go_package = dep_fdp.options.go_package
 					if '/' in dep_go_package:
-						# the go package was specified explicitly, no need to help gogo generator
+						# the go package was specified explicitly, no need to help go protobuf generator
 						if debug:
 							print("+ no substitution for {}, go_package is {}".format(dep, dep_go_package), file=sys.stderr)
 						continue
@@ -208,15 +208,15 @@ if len(gopath) > 0 and any(option.startswith('--gogo_out=') for option in option
 				print("+     {} -> {}".format(k, v), file=sys.stderr)
 
 		for i, option in enumerate(options):
-			if option.startswith('--gogo_out='):
+			if option.startswith('--go_out='):
 				arg = option.split('=', 1)[1]
 				substitutions_list = ",".join( "M{}={}".format(k, v) for k, v in sorted(substitutions.items()) )
 				if ':' in arg:
-					# there are some gogo options already given
-					option = '--gogo_out={},{}'.format(substitutions_list, arg)
+					# there are some go options already given
+					option = '--go_out={},{}'.format(substitutions_list, arg)
 				else:
-					# no gogo options given
-					option = '--gogo_out={}:{}'.format(substitutions_list, arg)
+					# no go options given
+					option = '--go_out={}:{}'.format(substitutions_list, arg)
 				options[i] = option
 
 exec_args = ["protoc"] + include_paths(cmd_proto_path) + options + expanded_proto_files
@@ -224,5 +224,6 @@ exec_args = ["protoc"] + include_paths(cmd_proto_path) + options + expanded_prot
 if debug:
 	print("+ final execute: ", exec_args, file=sys.stderr)
 
+sys.stderr.flush()
 os.execvp(protoc, exec_args)
 exit(1)
